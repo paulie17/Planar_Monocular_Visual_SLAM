@@ -161,6 +161,9 @@ namespace visual_slam{
             ){
                     Eigen::Vector3d p = LinearLSTriangulation(current_frame->kpts[matches[i].queryIdx],current_frame->p_matrix,
                                                                 last_frame->kpts[matches[i].trainIdx],last_frame->p_matrix);
+                    if ( !this->isInFrame(p) ){
+                        continue;
+                    }
                     MapPoint::Ptr map_point (new MapPoint(
                                     last_triangulated_point, p, current_frame->dscs.row(matches[i].queryIdx).clone(), current_frame.get()));
                     map_point->insert_frame(last_frame.get());
