@@ -23,9 +23,9 @@ namespace visual_slam{
         for (int i = 0; i < cam->kpts.size();i++){
             cam->unassigned_kpts.push_back(i);
         }
-
+        cam->seq = this->n_of_cams();
         if ( (this->n_of_cams()) == 0){
-            cam->odom_displ.setZero();
+            cam->odom_displ.setIdentity();
         } else{
             cam->odom_displ = t2v(camera_vector_.back()->robot_pose.inverse()*pose);
         }

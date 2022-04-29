@@ -20,6 +20,7 @@ namespace visual_slam{
         typedef std::shared_ptr<Camera> Ptr;
         typedef std::shared_ptr<const Camera> ConstPtr;
 
+        int seq;
         cv::Mat dscs;
         std::vector<cv::Point2f> kpts;
         Eigen::Isometry2d robot_pose; // robot pose from odometry when the frame has been captured in SE(2)
