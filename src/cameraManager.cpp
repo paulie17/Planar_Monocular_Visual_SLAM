@@ -88,6 +88,57 @@ namespace visual_slam{
 
     }
 
+    bool CameraManager::checkTransform(const geometry_msgs::Pose& odom_pose, const cv::Mat& image){
+
+        Eigen::Isometry3d pose_eigen;
+        Eigen::Isometry2d pose_eigen_2d;
+        Eigen::Vector3d odom_displ;
+        tf::poseMsgToEigen(odom_pose,pose_eigen);
+        pose_eigen_2d = t3t2d(pose_eigen);
+
+        odom_displ = t2v(camera_vector_.back()->robot_pose.inverse()*pose_eigen_2d);
+
+        if( odom_displ.head(2).norm() > 0.1){
+            cv::Mat clahe_image;
+            clahe_->apply(image,clahe_image);
+
+            // Find matches with last frame
+            std::vector<cv::KeyPoint> kpts_current;
+            std::vector<cv::Point2f> pts_last,pts_current;
+            cv::Mat dscs_current;
+
+            std::vector< std::vector< cv::DMatch > > matches_feats;
+            std::vector<cv::DMatch> matches;
+
+            cv::Mat F;
+            cv::Mat f_mask;
+
+            orb_->detect(clahe_image, kpts_current);
+            orb_->compute(clahe_image, kpts_current, dscs_current);
+
+            matcher_.knnMatch(dscs_current,camera_vector_.back()->dscs,matches_feats,2,cv::noArray());
+            filterMatches(matches_feats, matches);
+
+            if (matches.size() == 0){
+                return false;
+            }
+
+            for (int i = 0; i < matches.size(); i ++){
+                pts_current.push_back(kpts_current[matches[i].queryIdx].pt);
+                pts_last.push_back(camera_vector_.back()->kpts[matches[i].trainIdx]);
+            }
+
+            //compute Fundamental with previous frame
+
+            F = cv::findFundamentalMat(pts_last,pts_current,f_mask,cv::FM_RANSAC,1.,0.99);
+            latest_inliers_ = f_mask;
+            return true;
+        }else {
+            return false;
+        }
+
+    }
+
     void CameraManager::filterMatches(const std::vector<std::vector<cv::DMatch> >& matches_feats,std::vector<cv::DMatch>& matches){    
         // Clearing the current matches vector
         matches.clear();

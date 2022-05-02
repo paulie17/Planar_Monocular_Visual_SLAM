@@ -91,7 +91,8 @@ namespace visual_slam{
                 cams_.addCameraMatrix(P);
             }
             else{
-                if (cams_.checkTransform(cv_ptr->image)){
+                // if (cams_.checkTransform(cv_ptr->image)){
+                if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
                     ROS_INFO("Significant parallax detected, adding keyframe!");
                     Eigen::Isometry3d pose_eigen;
                     Eigen::Isometry2d pose_eigen_2d;

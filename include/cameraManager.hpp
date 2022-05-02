@@ -72,6 +72,8 @@ namespace visual_slam{
 
         bool checkTransform(const cv::Mat& image); // check whether there is a significant parallax (Homography vs Fundamental matrix inliers)
 
+        bool checkTransform(const geometry_msgs::Pose& odom_pose, const cv::Mat& image); // check whether the robot has translated significantly from the last keyframe
+
         Eigen::Vector3d LinearLSTriangulation(  const cv::Point2f& img_pt1,       // image point (u,v)
                                                 const Eigen3_4d& proj_mat1,       //camera 1 matrix
                                                 const cv::Point2f& img_pt2,      //image point in 2nd camera
