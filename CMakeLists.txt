@@ -31,7 +31,8 @@ add_library(visual_slam
             src/cameraManager.cpp
             src/Map.cpp 
             src/MapPoint.cpp 
-            src/visual_slam_interface.cpp)
+            src/visual_slam_interface.cpp
+            src/condensed_optimizer.cpp)
 # target_link_libraries(visual_slam
 #                       ${OpenCV_LIBRARIES}
 #                       ${Boost_LIBRARIES})

@@ -3,7 +3,8 @@
 namespace visual_slam{
 
     FrameProc::FrameProc(ros::NodeHandle* nodehandle):
-            nh_(*nodehandle)
+            nh_(*nodehandle),
+            opt_(cams_.keyframes_vector_(),cams_.map())
         {
             marker_pub_ = nh_.advertise<visualization_msgs::Marker>("map_points", 1);
             // odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/new_odom", 1);
@@ -61,67 +62,67 @@ namespace visual_slam{
 
     void FrameProc::addFrame(const sensor_msgs::ImageConstPtr& msg,const nav_msgs::Odometry::ConstPtr& odometry){
 
-            cv_bridge::CvImagePtr cv_ptr;
+        cv_bridge::CvImagePtr cv_ptr;
 
-            try
-            {
-            cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
-            }
-            catch (cv_bridge::Exception& e)
-            {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-            }
-    
-            if (cams_.n_of_cams() == 0){
+        try
+        {
+        cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+        }
+        catch (cv_bridge::Exception& e)
+        {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return;
+        }
 
-                boost::shared_ptr<sensor_msgs::CameraInfo const> shared_camera_infos;
-                shared_camera_infos = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("/camera_info",nh_);
+        if (cams_.n_of_cams() == 0){
 
-	            // Eigen::Matrix3d K;
-                Eigen::Matrix<double,3,4,Eigen::RowMajor> P( shared_camera_infos->P.data() );
-                // K = P.block<3,3>(0,0);
-                // std::cout << K ;
+            boost::shared_ptr<sensor_msgs::CameraInfo const> shared_camera_infos;
+            shared_camera_infos = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("/camera_info",nh_);
+
+            // Eigen::Matrix3d K;
+            Eigen::Matrix<double,3,4,Eigen::RowMajor> P( shared_camera_infos->P.data() );
+            // K = P.block<3,3>(0,0);
+            // std::cout << K ;
+            Eigen::Isometry3d pose_eigen;
+            Eigen::Isometry2d pose_eigen_2d;
+            tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
+            pose_eigen_2d = t3t2d(pose_eigen);
+            cams_.addImageSize(double(shared_camera_infos->height), double(shared_camera_infos->width));
+            cams_.addCameraMatrix(P);
+            cams_.addCamera(cv_ptr->image,pose_eigen_2d);
+        }
+        else{
+            if (cams_.checkTransform(cv_ptr->image)){
+            // if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
+                ROS_INFO("Significant parallax detected, adding keyframe!");
                 Eigen::Isometry3d pose_eigen;
                 Eigen::Isometry2d pose_eigen_2d;
                 tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
                 pose_eigen_2d = t3t2d(pose_eigen);
-                cams_.addImageSize(double(shared_camera_infos->height), double(shared_camera_infos->width));
                 cams_.addCamera(cv_ptr->image,pose_eigen_2d);
-                cams_.addCameraMatrix(P);
+                cams_.fullBA();
+                
+                visualizeMap();
+
+                // nav_msgs::Odometry new_odometry = *odometry;
+                // new_odometry.header.frame_id = "my_frame";
+                // odom_pub_.publish(new_odometry);
+
+                geometry_msgs::PoseStamped  new_pose;
+                tf::poseEigenToMsg(t2t3d(cams_.last_keyframe()->robot_pose),new_pose.pose);
+                new_pose.header.frame_id= "my_frame";
+                new_pose.header.stamp= ros::Time::now();
+                new_pose.header.seq = cams_.n_of_cams();
+                pose_pub_.publish(new_pose);
+
+            } else {
+                ROS_INFO("Not a keyframe.");
             }
-            else{
-                if (cams_.checkTransform(cv_ptr->image)){
-                // if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
-                    ROS_INFO("Significant parallax detected, adding keyframe!");
-                    Eigen::Isometry3d pose_eigen;
-                    Eigen::Isometry2d pose_eigen_2d;
-                    tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
-                    pose_eigen_2d = t3t2d(pose_eigen);
-                    cams_.addCamera(cv_ptr->image,pose_eigen_2d);
-                    cams_.fullBA();
-                    
-                    visualizeMap();
+            // ros::shutdown();
+        }            
 
-                    // nav_msgs::Odometry new_odometry = *odometry;
-                    // new_odometry.header.frame_id = "my_frame";
-                    // odom_pub_.publish(new_odometry);
+        ROS_INFO_STREAM("Number of keyframes added:" << cams_.n_of_cams());
 
-                    geometry_msgs::PoseStamped  new_pose;
-                    tf::poseEigenToMsg(t2t3d(cams_.last_keyframe()->robot_pose),new_pose.pose);
-                    new_pose.header.frame_id= "my_frame";
-                    new_pose.header.stamp= ros::Time::now();
-                    new_pose.header.seq = cams_.n_of_cams();
-                    pose_pub_.publish(new_pose);
-
-                } else {
-                    ROS_INFO("Not a keyframe.");
-                }
-                // ros::shutdown();
-            }            
-
-            ROS_INFO_STREAM("Number of keyframes added:" << cams_.n_of_cams());
-
-        } // addFrame
+    } // addFrame
 
 } // namespace visual_slam

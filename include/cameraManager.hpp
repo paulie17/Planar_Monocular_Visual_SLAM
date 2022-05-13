@@ -43,7 +43,6 @@ namespace visual_slam{
         
         CameraManager():            
             map_ ( new world_Map ),
-            // opt_( std::make_shared<std::vector<Camera::Ptr> >(camera_vector_),map() ),
             matcher_ ( new cv::flann::LshIndexParams ( 5,10,2 ))
         {
             orb_ = cv::ORB::create(MAX_FEATURES_);
@@ -95,11 +94,14 @@ namespace visual_slam{
             return std::const_pointer_cast<const Camera>(camera_vector_.back());
         }
 
+        auto keyframes_vector_(){
+            return std::make_shared<const std::vector<Camera::Ptr> >(camera_vector_);
+        }
+
         private:
 
         std::vector<Camera::Ptr> camera_vector_;
         world_Map::Ptr map_;          
-        // condensed_optimizer opt_;
         cv::Ptr<cv::CLAHE> clahe_;
         cv::Ptr<cv::ORB> orb_;
         cv::FlannBasedMatcher matcher_;

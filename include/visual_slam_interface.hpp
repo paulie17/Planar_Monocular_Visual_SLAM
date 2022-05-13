@@ -15,7 +15,8 @@
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include <cameraManager.hpp>
+// #include <cameraManager.hpp>
+#include <condensed_optimizer.hpp>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -47,6 +48,7 @@ namespace visual_slam{
         boost::shared_ptr<Sync> sync_;
 
         CameraManager cams_;
+        condensed_optimizer opt_;
     }; // class FrameProc
 
 

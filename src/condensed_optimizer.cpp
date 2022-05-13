@@ -2,19 +2,19 @@
 
 namespace visual_slam{
 
-    void local_map::write_observed_landmarks(){
+    void condensed_optimizer::write_observed_landmarks(local_map::Ptr map_ptr){
 
-        for (int i = first_frame_ptr->seq; i < last_frame_ptr->seq + 1; i++){
+        for (int i = map_ptr->first_frame_ptr->seq; i < map_ptr->last_frame_ptr->seq + 1; i++){
             
-            for (auto& observations: frames_vector_ptr_[i]->observed_points){
-                observed_landmarks_ids.push_back(observations.second->id);                
+            for (auto& observations: frames_vector_ptr_->at(i)->observed_points){
+                map_ptr->observed_landmarks_ids.push_back(observations.second->id);                
             }
 
         }
 
-        std::sort( observed_landmarks_ids.begin(), observed_landmarks_ids.end() );
-        observed_landmarks_ids.erase( unique( observed_landmarks_ids.begin(), observed_landmarks_ids.end() ), 
-                                                        observed_landmarks_ids.end() );
+        std::sort( map_ptr->observed_landmarks_ids.begin(), map_ptr->observed_landmarks_ids.end() );
+        map_ptr->observed_landmarks_ids.erase( unique( map_ptr->observed_landmarks_ids.begin(), map_ptr->observed_landmarks_ids.end() ), 
+                                                        map_ptr->observed_landmarks_ids.end() );
 
     }
 
@@ -35,7 +35,8 @@ namespace visual_slam{
             // Every 10 frames write the 10th frame as the last of the current local map and the first of the new local map
             
             maps_.back()->last_frame_ptr = frames_vector_ptr_->back();
-
+            write_observed_landmarks(maps_.back());
+            
             local_map::Ptr map( new local_map());
             map->first_frame_ptr = frames_vector_ptr_->back();
             map->seq = maps_.size();
@@ -62,7 +63,7 @@ namespace visual_slam{
         int index = maps_.size() - 2;
         local_map::Ptr map_to_be_written = maps_[index];
         local_map::Ptr previous_one = maps_[index-1];
-        local_map::Ptr next_one = maps_[index+1;];
+        local_map::Ptr next_one = maps_[index+1];
 
         std::vector<long unsigned> previous_intersection;
         std::vector<long unsigned> final_intersection;
@@ -83,10 +84,10 @@ namespace visual_slam{
 
     }
 
-    void condensed_optimizer::optimize_local_map(){
+    // void condensed_optimizer::optimize_local_map(){
 
 
-    }
+    // }
 
 
 }
