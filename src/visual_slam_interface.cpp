@@ -87,8 +87,9 @@ namespace visual_slam{
                 tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
                 pose_eigen_2d = t3t2d(pose_eigen);
                 cams_.addImageSize(double(shared_camera_infos->height), double(shared_camera_infos->width));
-                cams_.addCamera(cv_ptr->image,pose_eigen_2d);
                 cams_.addCameraMatrix(P);
+                cams_.addCamera(cv_ptr->image,pose_eigen_2d);
+                
             }
             else{
                 if (cams_.checkTransform(cv_ptr->image)){
