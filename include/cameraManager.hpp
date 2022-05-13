@@ -42,6 +42,7 @@ namespace visual_slam{
         public:
         
         CameraManager():
+            // opt_( std::make_shared<std::vector<Camera::Ptr> >(camera_vector_) ),
             map_ ( new world_Map ),
             matcher_ ( new cv::flann::LshIndexParams ( 5,10,2 ))
         {
@@ -98,7 +99,7 @@ namespace visual_slam{
 
         std::vector<Camera::Ptr> camera_vector_;
         world_Map::Ptr map_;          
-
+        // condensed_optimizer opt_;
         cv::Ptr<cv::CLAHE> clahe_;
         cv::Ptr<cv::ORB> orb_;
         cv::FlannBasedMatcher matcher_;
