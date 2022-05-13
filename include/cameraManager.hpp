@@ -41,9 +41,9 @@ namespace visual_slam{
     class CameraManager{
         public:
         
-        CameraManager():
-            // opt_( std::make_shared<std::vector<Camera::Ptr> >(camera_vector_) ),
+        CameraManager():            
             map_ ( new world_Map ),
+            // opt_( std::make_shared<std::vector<Camera::Ptr> >(camera_vector_),map() ),
             matcher_ ( new cv::flann::LshIndexParams ( 5,10,2 ))
         {
             orb_ = cv::ORB::create(MAX_FEATURES_);
