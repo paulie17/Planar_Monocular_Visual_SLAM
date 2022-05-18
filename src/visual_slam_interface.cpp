@@ -4,6 +4,7 @@ namespace visual_slam{
 
     FrameProc::FrameProc(ros::NodeHandle* nodehandle):
             nh_(*nodehandle),
+            cams_(),
             opt_(cams_.keyframes_vector_(),cams_.map())
         {
             marker_pub_ = nh_.advertise<visualization_msgs::Marker>("map_points", 1);
@@ -89,7 +90,8 @@ namespace visual_slam{
             pose_eigen_2d = t3t2d(pose_eigen);
             cams_.addImageSize(double(shared_camera_infos->height), double(shared_camera_infos->width));
             cams_.addCameraMatrix(P);
-            cams_.addCamera(cv_ptr->image,pose_eigen_2d);
+            cams_.addCamera(cv_ptr->image,pose_eigen_2d);            
+            opt_.local_maps_manager();
         }
         else{
             if (cams_.checkTransform(cv_ptr->image)){
@@ -100,6 +102,7 @@ namespace visual_slam{
                 tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
                 pose_eigen_2d = t3t2d(pose_eigen);
                 cams_.addCamera(cv_ptr->image,pose_eigen_2d);
+                opt_.local_maps_manager();
                 cams_.fullBA();
                 
                 visualizeMap();

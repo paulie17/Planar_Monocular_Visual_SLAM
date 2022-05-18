@@ -94,8 +94,8 @@ namespace visual_slam{
             return std::const_pointer_cast<const Camera>(camera_vector_.back());
         }
 
-        auto keyframes_vector_(){
-            return std::make_shared<const std::vector<Camera::Ptr> >(camera_vector_);
+        std::vector<Camera::Ptr>& keyframes_vector_(){
+            return camera_vector_;
         }
 
         private:
