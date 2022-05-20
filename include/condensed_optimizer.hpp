@@ -2,13 +2,14 @@
 
 #include <g2o/core/sparse_block_matrix.h>
 #include <cameraManager.hpp>
+#include <ros/ros.h>
 
 
 namespace visual_slam{
 
     struct local_map{
 
-        typedef std::shared_ptr<local_map> Ptr;
+        // typedef std::shared_ptr<local_map> Ptr;
         // typedef std::shared_ptr<const local_map> ConstPtr;
 
         int seq;
@@ -37,22 +38,31 @@ namespace visual_slam{
             // landmarks_map_ = ptr_to_map;
         };
 
-        void write_observed_landmarks(local_map lmap); // call this method when writing the pointer to the last frame: iterate over the frames that are part of the map 
+        void write_observed_landmarks(local_map& lmap); // call this method when writing the pointer to the last frame of a map: iterate over the frames that are part of the map 
                                             // and insert the ids of all the observed landmarks.
 
         void local_maps_manager(); 
-        // Create a new local map OR insert a new frame into the latest local map OR add reference to origin.
+        // Create a new local map OR insert a new frame into the latest local map OR add pointer to origin.
         // Call after every keyframe insertion.
 
-        void write_separators();
+        void write_landmarks_separators();
         // Call when creating a new local map.
         // It writes the separators of the second last local map (if size of maps_ is at least 3)
 
-        // void optimize_local_map(){};
-        // // optimize local map with projection measurements and compute marginals.
-        // // Call after the pointer to the last frame has been written.
 
-    
+        void optimize_local_map();
+        // optimize local map with projection measurements and compute marginals.
+        // Call after the pointer to the last frame has been written.
+
+        inline int n_of_local_maps(){
+            return maps_.size();
+        };
+
+        inline void last_map_verbose(){
+            std::cout << "Last map first frame id: " << maps_.back().first_frame_ptr->seq << "\n";
+            std::cout << "Last map last frame id: " << maps_.back().last_frame_ptr->seq << "\n";
+            std::cout << "Last map origin frame id: " << maps_.back().origin_ptr->seq << "\n";
+        };
 
         private:
 

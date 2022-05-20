@@ -94,8 +94,8 @@ namespace visual_slam{
             opt_.local_maps_manager();
         }
         else{
-            if (cams_.checkTransform(cv_ptr->image)){
-            // if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
+            // if (cams_.checkTransform(cv_ptr->image)){
+            if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
                 ROS_INFO("Significant parallax detected, adding keyframe!");
                 Eigen::Isometry3d pose_eigen;
                 Eigen::Isometry2d pose_eigen_2d;
@@ -103,7 +103,7 @@ namespace visual_slam{
                 pose_eigen_2d = t3t2d(pose_eigen);
                 cams_.addCamera(cv_ptr->image,pose_eigen_2d);
                 opt_.local_maps_manager();
-                cams_.fullBA();
+                // cams_.fullBA();
                 
                 visualizeMap();
 
@@ -125,6 +125,7 @@ namespace visual_slam{
         }            
 
         ROS_INFO_STREAM("Number of keyframes added:" << cams_.n_of_cams());
+        ROS_INFO_STREAM("Number of local_maps written in the condensed optimizers:" << opt_.n_of_local_maps());
 
     } // addFrame
 

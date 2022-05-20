@@ -11,7 +11,7 @@
     </node>
 
     <node pkg="rosbag" type="play" name="player" 
-          args="--clock /home/paolo/april_tag_corridor_rectified_2021-05-26-14-19-27.compressed.bag --rate=0.5"/>
+          args="--clock /home/paolo/april_tag_corridor_rectified_2021-05-26-14-19-27.compressed.bag --rate=0.9"/>
 
 
 </launch>

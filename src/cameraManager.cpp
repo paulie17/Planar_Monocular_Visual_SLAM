@@ -316,7 +316,7 @@ namespace visual_slam{
             }
 
         }
-        optimizer.setVerbose(true);
+        // optimizer.setVerbose(true);
         optimizer.initializeOptimization();
         optimizer.optimize(5);
 
