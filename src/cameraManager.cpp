@@ -120,7 +120,7 @@ namespace visual_slam{
             filterMatches(matches_feats, matches);
 
             if (matches.size() == 0){
-                return false;
+                return true;
             }
 
             for (int i = 0; i < matches.size(); i ++){

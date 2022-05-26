@@ -3,7 +3,8 @@ project(visual_slam)
 # set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_BUILD_TYPE Debug)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ")
+LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
@@ -21,6 +22,12 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 find_package(g2o REQUIRED)
 include_directories(${G2O_INCLUDE_DIRS})
+find_package(Cholmod REQUIRED)
+include_directories(${CHOLMOD_INCLUDE_DIR})
+find_package(CSparse REQUIRED)
+include_directories(${CSPARSE_INCLUDE_DIR})
+
+
 
 catkin_package()
 
@@ -41,5 +48,10 @@ add_library(visual_slam
 
 add_executable(test_node Executables/test_node_new.cpp)
 target_link_libraries(test_node visual_slam ${catkin_LIBRARIES}
-g2o_stuff g2o_core g2o_types_slam3d g2o_solver_eigen  )
+g2o_stuff g2o_core g2o_types_slam3d g2o_solver_eigen g2o_types_slam2d 
+g2o_solver_cholmod cholmod 
+# g2o_solver_csparse
+# g2o_csparse_extension
+# g2o_solver_pcg
+)
 

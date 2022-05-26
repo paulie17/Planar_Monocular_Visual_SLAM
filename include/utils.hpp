@@ -7,6 +7,7 @@ namespace visual_slam{
     typedef Eigen::Matrix<double, 3, 4> Eigen3_4d;
     typedef Eigen::Matrix<double, 4, 3> Eigen4_3d;
     typedef Eigen::Matrix<double, 6, 1> Vector6d;
+    typedef std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > Vector3dVector;
 
     // template <class Derived>
     // void floatMultiArrayToEigen(std_msgs::Float64MultiArray &m, Eigen::MatrixBase<Derived> &e)
@@ -25,6 +26,9 @@ namespace visual_slam{
 
     //     // e = Eigen::Map<Derived>(m.data.data(), rows, cols);
     // }
+
+    
+
 
 
     inline Eigen::Isometry3d t2t3d(const Eigen::Isometry2d &iso){
@@ -78,5 +82,59 @@ namespace visual_slam{
         // std::cout << v_2d << std::endl;
         return v2t(v_2d);
     }
+    
+    inline void covariance_3d_to_control_points( const Eigen::Matrix3d& cov, const Eigen::Vector3d& mean, Vector3dVector& sigma_pts){
 
+            double lambda, alpha, n;
+            int point_idx = 1;
+            Eigen::Matrix3d L;
+            
+            n = 3;
+            alpha = 0.001;
+            lambda = alpha*alpha*n;
+
+            L = ((n+lambda)*cov).llt().matrixL();
+            
+
+            sigma_pts.clear();
+            sigma_pts.reserve(2*n+1);
+            sigma_pts[0] = mean;
+
+            for (int i = 0; i < n; i ++){            
+                
+                sigma_pts[point_idx] = mean + L.col(i);
+                point_idx++;
+                sigma_pts[point_idx] = mean - L.col(i);
+                point_idx++;
+            }
+            
+        }
+
+        inline void control_pts_to_pose_omega(  const Vector3dVector& sigma_pts, const Eigen::Vector3d& mean, 
+                                                    const Eigen::Isometry2d& origin_pose, const Eigen::Isometry2d& separator_pose,
+                                                    Eigen::Matrix3d& omega_condensed){
+            Vector3dVector transformed_sigma_pts;
+            int n = 3;
+            double alpha = 0.001;
+            double lambda = alpha*alpha*n;
+            double w_c = 1/(2*(n+lambda));
+            
+            omega_condensed.setZero();
+
+            transformed_sigma_pts.reserve(2*n+1);
+
+            for (int i = 0; i < 2*n+1; i ++){
+
+                transformed_sigma_pts[i] = t2v( v2t(mean).inverse() * origin_pose.inverse() * v2t( sigma_pts[i] ) * separator_pose );
+
+            }
+
+            for (int i = 1; i < 2*n+1; i++){
+
+                omega_condensed += w_c * (transformed_sigma_pts[i] - mean)*(transformed_sigma_pts[i] - mean).transpose();
+
+            }
+            
+            omega_condensed = omega_condensed.inverse().eval();
+        }
 } // namespace utils

@@ -5,7 +5,7 @@
          <!-- Show in Rviz    -->
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find visual_slam)/rviz/visual_slam_rviz_config.rviz" required="true"  output="screen" launch-prefix="xterm -e" />
 
-    <node name = "test" pkg="visual_slam" type="test_node" output="screen" >
+    <node name = "test" pkg="visual_slam" type="test_node" output="screen"  >
         <remap from="/camera/image_raw" to="/camera/fisheye1_rect/image_raw"/>
         <remap from="/camera_info" to="/camera/fisheye1_rect/camera_info"/>
     </node>
