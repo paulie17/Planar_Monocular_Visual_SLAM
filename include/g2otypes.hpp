@@ -6,7 +6,7 @@
 #include <g2o/types/slam2d/types_slam2d.h>
 #include <g2o/core/base_unary_edge.h>
 
-#include <g2o/stuff/misc.h>
+#include <g2o/stuff/unscented.h>
 #include <g2o/core/block_solver.h>
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/core/robust_kernel.h>
@@ -23,7 +23,7 @@
 
 #include <utils.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     class VertexRobotSE2 : public g2o::BaseVertex<3, Eigen::Isometry2d>
     {
@@ -88,11 +88,12 @@ namespace visual_slam{
                 VertexRobotSE2* pose_1 = static_cast< VertexRobotSE2*> ( _vertices[0] ); 
                 VertexRobotSE2* pose_2 = static_cast< VertexRobotSE2*> ( _vertices[1] ); 
                 Eigen::Isometry2d transform = pose_1->estimate().inverse()*pose_2->estimate();
-                Eigen::Vector3d v;
-                v.head<2>()=transform.translation();
-                v(2) = atan2(transform.linear()(1,0), transform.linear()(0,0));
-                _error = _measurement - v;
-                _error[2] = g2o::normalize_theta(_error[2]);
+                // Eigen::Vector3d v;
+                // v.head<2>()=transform.translation();
+                // v(2) = atan2(transform.linear()(1,0), transform.linear()(0,0));
+                // _error = _measurement - v;
+                // _error[2] = g2o::normalize_theta(_error[2]);
+                _error = t2v(transform);
             }
     };
 
@@ -108,8 +109,8 @@ namespace visual_slam{
             inline void computeError(){      
                 g2o::VertexSE2* pose = static_cast< g2o::VertexSE2*> ( _vertices[1] );        
                 g2o::VertexPointXYZ* landmark = static_cast< g2o::VertexPointXYZ*> ( _vertices[0] );          
-                _error = _measurement - t2t3d(pose->estimate().toIsometry())*landmark->estimate() ;
-                // _error = _measurement - pose->project(landmark->estimate());
+                _error = _measurement - t2t3d(pose->estimate().toIsometry()).inverse()*landmark->estimate() ;
+                
             }
 
     };

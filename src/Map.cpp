@@ -1,6 +1,6 @@
 #include <Map.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     bool world_Map::insertMapPoint ( MapPoint::Ptr map_point ) // Return true if insertion is successful, false otherwise
     {

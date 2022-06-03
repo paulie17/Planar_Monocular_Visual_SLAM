@@ -1,6 +1,6 @@
 #include <MapPoint.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     MapPoint::MapPoint()
     : id(-1), p_world(Eigen::Vector3d(0,0,0)) 

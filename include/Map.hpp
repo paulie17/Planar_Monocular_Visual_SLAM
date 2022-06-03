@@ -2,7 +2,7 @@
 
 #include <MapPoint.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     struct world_Map{
 

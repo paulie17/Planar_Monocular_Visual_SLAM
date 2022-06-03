@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>visual_slam</name>
+  <name>planar_monocular_slam_thesis</name>
   <version>0.0.0</version>
   <description>The visual_slam package</description>
 

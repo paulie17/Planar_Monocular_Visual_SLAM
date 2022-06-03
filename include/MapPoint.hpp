@@ -5,7 +5,7 @@
 #include <Eigen/StdVector>
 #include <opencv2/opencv.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     struct Camera;
 

@@ -3,15 +3,15 @@
     <node pkg="tf" type="static_transform_publisher" name="my_frame_broadcaster" args="0 0 0 0 0 0 1 map my_frame 10" />
 
          <!-- Show in Rviz    -->
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find visual_slam)/rviz/visual_slam_rviz_config.rviz" required="true"  output="screen" launch-prefix="xterm -e" />
-
-    <node name = "test" pkg="visual_slam" type="test_node" output="screen"  >
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find planar_monocular_slam_thesis)/rviz/visual_slam_rviz_config.rviz" required="true"  output="screen" launch-prefix="xterm -e" />
+    
+    <node name = "planar_monocular_slam_node" pkg="planar_monocular_slam_thesis" type="planar_monocular_slam_node" output="screen" >
         <remap from="/camera/image_raw" to="/camera/fisheye1_rect/image_raw"/>
         <remap from="/camera_info" to="/camera/fisheye1_rect/camera_info"/>
     </node>
 
     <node pkg="rosbag" type="play" name="player" 
-          args="--clock /home/paolo/april_tag_corridor_rectified_2021-05-26-14-19-27.compressed.bag --rate=0.9"/>
+          args="--clock /home/paolo/april_tag_corridor_rectified_2021-05-26-14-19-27.compressed.bag --rate=0.99"/>
 
 
 </launch>

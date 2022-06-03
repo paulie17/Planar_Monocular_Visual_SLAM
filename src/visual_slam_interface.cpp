@@ -1,6 +1,6 @@
 #include <visual_slam_interface.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     FrameProc::FrameProc(ros::NodeHandle* nodehandle):
             nh_(*nodehandle),
@@ -8,13 +8,17 @@ namespace visual_slam{
             opt_(cams_.keyframes_vector_(),cams_.map())
         {
             marker_pub_ = nh_.advertise<visualization_msgs::Marker>("map_points", 1);
-            // odom_pub_ = nh_.advertise<nav_msgs::Odometry>("/new_odom", 1);
-            pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/keyframes_trajectory", 1);
+
+            odom_path_pub_ = nh_.advertise<nav_msgs::Path>("/odom_path", 1);
+            opt_path_pub_ = nh_.advertise<nav_msgs::Path>("/opt_path", 1);
 
             image_sub_.subscribe(nh_, "/camera/image_raw", 1);
             odom_sub_.subscribe(nh_,"/odom",1);
             sync_.reset(new Sync(MySyncPolicy(10),image_sub_,odom_sub_));   
             sync_->registerCallback(boost::bind(&FrameProc::addFrame, this, _1, _2));
+
+            odom_path_.header.stamp = ros::Time::now();
+            odom_path_.header.frame_id = "my_frame";
 
             Eigen::Matrix4d cam_to_robot;
             cam_to_robot << 0, 0,1,0,
@@ -61,6 +65,25 @@ namespace visual_slam{
         marker_pub_.publish(points_list);
     }
 
+    void FrameProc::visualizeTrajectory(){
+
+        nav_msgs::Path opt_path_;
+        opt_path_.header.stamp = ros::Time::now();
+        opt_path_.header.frame_id = "my_frame";
+
+        for (int i = 0; i < cams_.n_of_cams(); i++){
+
+            geometry_msgs::PoseStamped  pose;
+            tf::poseEigenToMsg(t2t3d(cams_.keyframes_vector_().at(i)->robot_pose),pose.pose);
+            pose.header.frame_id= "my_frame";
+            pose.header.stamp= ros::Time::now();
+            opt_path_.poses.push_back(pose);
+
+        }
+
+        opt_path_pub_.publish(opt_path_);
+    }
+
     void FrameProc::addFrame(const sensor_msgs::ImageConstPtr& msg,const nav_msgs::Odometry::ConstPtr& odometry){
 
         cv_bridge::CvImagePtr cv_ptr;
@@ -92,11 +115,29 @@ namespace visual_slam{
             cams_.addCameraMatrix(P);
             cams_.addCamera(cv_ptr->image,pose_eigen_2d);            
             opt_.local_maps_manager();
+
+            geometry_msgs::PoseStamped pose;
+
+            pose.header.stamp = ros::Time::now();
+            pose.header.frame_id = "my_frame";
+            pose.pose = odometry->pose.pose;            
+            odom_path_.poses.push_back(pose);
+            odom_path_pub_.publish(odom_path_);
+            visualizeTrajectory();
         }
         else{
             // if (cams_.checkTransform(cv_ptr->image)){
             if (cams_.checkTransform(odometry->pose.pose,cv_ptr->image)){    
-                ROS_INFO("Significant parallax detected, adding keyframe!");
+                ROS_INFO("Adding keyframe!");
+
+                geometry_msgs::PoseStamped pose;
+
+                pose.header.stamp = ros::Time::now();
+                pose.header.frame_id = "my_frame";
+                pose.pose = odometry->pose.pose;            
+                odom_path_.poses.push_back(pose);
+                odom_path_pub_.publish(odom_path_);    
+
                 Eigen::Isometry3d pose_eigen;
                 Eigen::Isometry2d pose_eigen_2d;
                 tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
@@ -104,19 +145,8 @@ namespace visual_slam{
                 cams_.addCamera(cv_ptr->image,pose_eigen_2d);
                 opt_.local_maps_manager();
                 // cams_.fullBA();
-                
+                visualizeTrajectory();
                 visualizeMap();
-
-                // nav_msgs::Odometry new_odometry = *odometry;
-                // new_odometry.header.frame_id = "my_frame";
-                // odom_pub_.publish(new_odometry);
-
-                geometry_msgs::PoseStamped  new_pose;
-                tf::poseEigenToMsg(t2t3d(cams_.last_keyframe()->robot_pose),new_pose.pose);
-                new_pose.header.frame_id= "my_frame";
-                new_pose.header.stamp= ros::Time::now();
-                new_pose.header.seq = cams_.n_of_cams();
-                pose_pub_.publish(new_pose);
 
             } else {
                 ROS_INFO("Not a keyframe.");

@@ -2,7 +2,7 @@
 
 #include <eigen_conversions/eigen_msg.h>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     typedef Eigen::Matrix<double, 3, 4> Eigen3_4d;
     typedef Eigen::Matrix<double, 4, 3> Eigen4_3d;
@@ -83,58 +83,4 @@ namespace visual_slam{
         return v2t(v_2d);
     }
     
-    inline void covariance_3d_to_control_points( const Eigen::Matrix3d& cov, const Eigen::Vector3d& mean, Vector3dVector& sigma_pts){
-
-            double lambda, alpha, n;
-            int point_idx = 1;
-            Eigen::Matrix3d L;
-            
-            n = 3;
-            alpha = 0.001;
-            lambda = alpha*alpha*n;
-
-            L = ((n+lambda)*cov).llt().matrixL();
-            
-
-            sigma_pts.clear();
-            sigma_pts.reserve(2*n+1);
-            sigma_pts[0] = mean;
-
-            for (int i = 0; i < n; i ++){            
-                
-                sigma_pts[point_idx] = mean + L.col(i);
-                point_idx++;
-                sigma_pts[point_idx] = mean - L.col(i);
-                point_idx++;
-            }
-            
-        }
-
-        inline void control_pts_to_pose_omega(  const Vector3dVector& sigma_pts, const Eigen::Vector3d& mean, 
-                                                    const Eigen::Isometry2d& origin_pose, const Eigen::Isometry2d& separator_pose,
-                                                    Eigen::Matrix3d& omega_condensed){
-            Vector3dVector transformed_sigma_pts;
-            int n = 3;
-            double alpha = 0.001;
-            double lambda = alpha*alpha*n;
-            double w_c = 1/(2*(n+lambda));
-            
-            omega_condensed.setZero();
-
-            transformed_sigma_pts.reserve(2*n+1);
-
-            for (int i = 0; i < 2*n+1; i ++){
-
-                transformed_sigma_pts[i] = t2v( v2t(mean).inverse() * origin_pose.inverse() * v2t( sigma_pts[i] ) * separator_pose );
-
-            }
-
-            for (int i = 1; i < 2*n+1; i++){
-
-                omega_condensed += w_c * (transformed_sigma_pts[i] - mean)*(transformed_sigma_pts[i] - mean).transpose();
-
-            }
-            
-            omega_condensed = omega_condensed.inverse().eval();
-        }
 } // namespace utils

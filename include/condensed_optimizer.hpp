@@ -4,8 +4,7 @@
 #include <cameraManager.hpp>
 #include <ros/ros.h>
 
-
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     struct local_map{
 
@@ -36,6 +35,7 @@ namespace visual_slam{
         
         bool initialized = false;
         int latest_vertex_index = 0;
+        std::vector<long unsigned> outliers_landmarks;
         std::map<long unsigned,int> landmark_to_graph;
         std::map<int,int> camera_to_graph;
     };
@@ -43,8 +43,8 @@ namespace visual_slam{
     class condensed_optimizer{
 
         public:
-
-        condensed_optimizer( std::vector<Camera::Ptr> &vector_ptr, world_Map::ConstPtr ptr_to_map):
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+        condensed_optimizer( const std::vector<Camera::Ptr> &vector_ptr, world_Map::ConstPtr ptr_to_map):
             landmarks_map_(ptr_to_map),
             frames_vector_ptr_(&vector_ptr)
         {
@@ -68,12 +68,11 @@ namespace visual_slam{
 
         void write_landmarks_separators();
         // Call when creating a new local map.
-        // It writes the separators of the second last local map (if size of maps_ is at least 3)
-
+        // It writes the separators of the second last local map (if size of maps_ is at least 3)        
 
         void optimize_local_map( local_map& lmap);
         // optimize local map with projection measurements and compute marginals.
-        // Call after the pointer to the last frame has been written.
+        // Call after the pointer to the last frame has been written.        
 
         void global_optimization();
 
@@ -89,7 +88,17 @@ namespace visual_slam{
 
         private:
 
-        std::vector<Camera::Ptr>* frames_vector_ptr_;
+        void pose_unscented_mapping (const Eigen::Matrix3d cov, const Eigen::Vector3d new_mean, Eigen::Matrix3d new_cov,
+	                                        const Eigen::Isometry2d gauge, const Eigen::Isometry2d separator);
+
+        void landmark_unscented_mapping (const Eigen::Matrix3d cov, Eigen::Matrix3d new_cov,
+	                                        const Eigen::Isometry2d gauge);
+        
+        bool covariance_condition_check( 	const g2o::SparseBlockMatrix< Eigen::MatrixXd >& marginals,
+						                    const g2o::SparseOptimizer& optimizer,
+						                    int graph_index);
+
+        const std::vector<Camera::Ptr>* frames_vector_ptr_;
         std::vector<local_map> maps_;
         world_Map::ConstPtr landmarks_map_;
         global_optimizer global_opt_;        

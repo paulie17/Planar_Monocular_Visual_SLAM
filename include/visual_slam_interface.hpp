@@ -6,8 +6,9 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/image_encodings.h>
 #include <visualization_msgs/Marker.h>
-#include "geometry_msgs/PoseStamped.h"
+// #include "geometry_msgs/PoseStamped.h"
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
 
 #include <eigen_conversions/eigen_msg.h>
 
@@ -22,7 +23,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     class FrameProc{
         //clas that processes frames
@@ -34,12 +35,15 @@ namespace visual_slam{
         
         void visualizeMap();
 
+        void visualizeTrajectory();
+
         private:
         ros::NodeHandle nh_;
 
         ros::Publisher marker_pub_; // publish 3d map points for visualization in rviz
-        ros::Publisher odom_pub_;  // publish odometry with changed frame_id for visualization purposes
-        ros::Publisher pose_pub_;  // publish optimized position for visualization purposes
+
+        ros::Publisher odom_path_pub_; // publisher of path according to odometry measurements
+        ros::Publisher opt_path_pub_; // publisher of optimized path
 
         message_filters::Subscriber<sensor_msgs::Image> image_sub_;
         message_filters::Subscriber<nav_msgs::Odometry> odom_sub_;
@@ -49,6 +53,8 @@ namespace visual_slam{
 
         CameraManager cams_;
         condensed_optimizer opt_;
+
+        nav_msgs::Path odom_path_;
     }; // class FrameProc
 
 

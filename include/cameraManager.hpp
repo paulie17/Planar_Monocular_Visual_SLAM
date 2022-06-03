@@ -13,7 +13,7 @@
 
 #include <g2otypes.hpp>
 
-namespace visual_slam{    
+namespace planar_monocular_slam{    
 
     struct Camera{
 
@@ -40,7 +40,7 @@ namespace visual_slam{
 
     class CameraManager{
         public:
-        
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         CameraManager():            
             map_ ( new world_Map ),
             matcher_ ( new cv::flann::LshIndexParams ( 5,10,2 ))
@@ -94,7 +94,7 @@ namespace visual_slam{
             return std::const_pointer_cast<const Camera>(camera_vector_.back());
         }
 
-        std::vector<Camera::Ptr>& keyframes_vector_(){
+        const std::vector<Camera::Ptr>& keyframes_vector_(){
             return camera_vector_;
         }
 

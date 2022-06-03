@@ -1,16 +1,13 @@
 #include <condensed_optimizer.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     void condensed_optimizer::write_observed_landmarks(local_map& lmap){
 
         for (int i = lmap.first_frame_ptr->seq; i < (lmap.last_frame_ptr->seq + 1); i++){
             
             for (auto& observations: frames_vector_ptr_->at(i)->observed_points){
-                lmap.observed_landmarks_ids.push_back(observations.second->id);   
-                // ROS_INFO("----------------------");
-                // ROS_INFO_STREAM(i);
-                // ROS_INFO_STREAM(observations.second->id);          
+                lmap.observed_landmarks_ids.push_back(observations.second->id);           
             }
 
         }
@@ -27,7 +24,7 @@ namespace visual_slam{
             // the first local map will have the first frame ptr equal to the origin ptr
             
             local_map lmap(frames_vector_ptr_->back(),maps_.size());
-            lmap.origin_ptr = frames_vector_ptr_->back();
+            lmap.origin_ptr = lmap.first_frame_ptr;
             maps_.push_back(lmap);
             return;
         }
@@ -46,17 +43,18 @@ namespace visual_slam{
         else if (frames_vector_ptr_->back()->seq - maps_.back().first_frame_ptr->seq == 1 && maps_.back().seq != 0){
 
             write_observed_landmarks(maps_[maps_.size()-2]);
-            ROS_INFO_STREAM("Writing observed landmarks of map " << maps_.size()-2);
+            // ROS_INFO_STREAM("Writing observed landmarks of map " << maps_.size()-2);
             write_landmarks_separators();
             
             if (maps_.size() > 2){
-                ROS_INFO_STREAM("Solving map optimization of " << maps_.size()-3);
+                // ROS_INFO_STREAM("Solving map optimization of " << maps_.size()-3);
                 optimize_local_map(maps_[maps_.size()-3]);
             }
             
             if (maps_.size() > 3){
                 global_optimization();
             }
+            return;
         }
 
         
@@ -73,7 +71,7 @@ namespace visual_slam{
         if (maps_.size() < 3){
             return;
         }
-        ROS_INFO_STREAM("Writing landmarks separators of map " << maps_.size()-3);
+        // ROS_INFO_STREAM("Writing landmarks separators of map " << maps_.size()-3);
         int index = maps_.size() - 3; // second last local map in the vector
         local_map* map_to_be_written; 
         local_map* previous_one;
@@ -99,6 +97,72 @@ namespace visual_slam{
                                 std::back_inserter(final_intersection));
 
         map_to_be_written->separators_mappoints = final_intersection;
+
+    }
+
+    void condensed_optimizer::pose_unscented_mapping (const Eigen::Matrix3d cov, const Eigen::Vector3d new_mean, Eigen::Matrix3d new_cov,
+	                                        const Eigen::Isometry2d gauge, const Eigen::Isometry2d separator) {
+    typedef g2o::SigmaPoint<Eigen::Vector3d> MySigmaPoint;
+
+    std::vector<MySigmaPoint, Eigen::aligned_allocator<MySigmaPoint> > spts;
+    Eigen::Vector3d mean;
+    mean.setZero();
+
+    sampleUnscented(spts, mean, cov);
+
+    // now apply the oplus operator to the sigma points,
+    // and get the points in the global space
+
+    std::vector<MySigmaPoint, Eigen::aligned_allocator<MySigmaPoint> >
+        tspts = spts;
+
+    for (int j = 0; j < spts.size(); j++) {
+
+    tspts[j]._sample = t2v( v2t(new_mean).inverse() * gauge.inverse() * v2t (spts[j]._sample) * separator ) ;
+
+    }
+
+    reconstructGaussian(mean, new_cov, tspts);
+    }
+
+    void condensed_optimizer::landmark_unscented_mapping (const Eigen::Matrix3d cov, Eigen::Matrix3d new_cov,
+	                                        const Eigen::Isometry2d gauge){
+    typedef g2o::SigmaPoint<Eigen::Vector3d> MySigmaPoint;
+    std::vector<MySigmaPoint, Eigen::aligned_allocator<MySigmaPoint> > spts;
+    Eigen::Vector3d mean;
+    mean.setZero();
+
+    sampleUnscented(spts, mean, cov);
+
+    // now apply the oplus operator to the sigma points,
+    // and get the points in the global space
+
+    std::vector<MySigmaPoint, Eigen::aligned_allocator<MySigmaPoint> >
+        tspts = spts;
+
+    for (int j = 0; j < spts.size(); j++) {
+
+    tspts[j]._sample = t2t3d(gauge).inverse() * spts[j]._sample ;
+
+    }
+
+    reconstructGaussian(mean, new_cov, tspts);
+    }
+
+    bool condensed_optimizer::covariance_condition_check( 	const g2o::SparseBlockMatrix< Eigen::MatrixXd >& marginals,
+						                const g2o::SparseOptimizer& optimizer,
+						                int graph_index)
+    {
+
+        Eigen::Matrix3d covariance = marginals.block(  optimizer.vertex(graph_index)->hessianIndex(),
+                                                    optimizer.vertex(graph_index)->hessianIndex())->eval();
+
+        double condition_number = covariance.eigenvalues().real().maxCoeff()/covariance.eigenvalues().real().minCoeff();
+        if(condition_number > 10e5 ){
+            return false;}
+        else{
+            return true;
+        }
 
     }
 
@@ -132,7 +196,7 @@ namespace visual_slam{
             
             VertexRobotSE2* robot = new VertexRobotSE2();
             robot->setId(j);
-            robot->setFixed(lmap.origin_ptr->seq == i);
+            robot->setFixed( i == lmap.origin_ptr->seq);
             robot->setEstimate((*frames_vector_ptr_)[i]->robot_pose);
             robot->p_matrix = (*frames_vector_ptr_)[i]->p_matrix;
             optimizer.addVertex(robot);   
@@ -183,10 +247,10 @@ namespace visual_slam{
         }
         // optimizer.setVerbose(true);
         optimizer.initializeOptimization();
-        optimizer.optimize(5);
+        optimizer.optimize(10);
 
         // update current estimates with optimization results
-        for (int i = lmap.first_frame_ptr->seq; i < lmap.last_frame_ptr->seq + 1; i++){
+        for (int i = lmap.first_frame_ptr->seq; i < (lmap.last_frame_ptr->seq + 1); i++){
             VertexRobotSE2* pose_update = static_cast< VertexRobotSE2*> ( optimizer.vertex(camera_to_graph.at(i)) );  
             frames_vector_ptr_->at(i)->robot_pose = pose_update->estimate();
         }
@@ -212,17 +276,16 @@ namespace visual_slam{
 
         }
 
-        optimizer.save("graph.g2o");
-        if (optimizer.verifyInformationMatrices(true)){
-            ROS_INFO("Information matrices are PSD");}
-        if (optimizer.gaugeFreedom()){
-            ROS_INFO(" The optimizer has gauge freedom");}
+        // if (optimizer.verifyInformationMatrices(true)){
+        //     ROS_INFO("Information matrices are PSD");}
+        // if (optimizer.gaugeFreedom()){
+        //     ROS_INFO(" The optimizer has gauge freedom");}
 
         // condensed_pairs.push_back(std::pair<int,int>(30,30));
-        ROS_INFO("Computing marginals...");
+        // ROS_INFO("Computing marginals...");
         optimizer.computeMarginals(marginals ,v_k);
-        ROS_INFO("Marginals computed!");
-        ROS_INFO_STREAM(marginals);
+        // ROS_INFO("Marginals computed!");
+        // ROS_INFO_STREAM(marginals);
         
         // std::cin.get();
         // add vertices and edges to the global optimizer
@@ -269,11 +332,19 @@ namespace visual_slam{
         // add map points vertices (if they haven't already been added)
         for( int i = 0; i < lmap.separators_mappoints.size(); i ++){
 
-            if(!global_opt_.landmark_to_graph.count(lmap.separators_mappoints[i])){
+            if ( !covariance_condition_check(marginals,optimizer,landmark_to_graph.at(lmap.separators_mappoints[i]))) {
+
+                global_opt_.outliers_landmarks.push_back(lmap.separators_mappoints[i]);
+                continue;
+            }
+
+            if(!global_opt_.landmark_to_graph.count(lmap.separators_mappoints[i]) && 
+                std::find(global_opt_.outliers_landmarks.begin(), global_opt_.outliers_landmarks.end(), lmap.separators_mappoints[i]) 
+                        == global_opt_.outliers_landmarks.end()){
 
                 g2o::VertexPointXYZ* landmark = new g2o::VertexPointXYZ();
                 landmark->setId(global_opt_.latest_vertex_index);
-                landmark->setMarginalized(true);
+                // landmark->setMarginalized(true);
                 landmark->setEstimate(landmarks_map_->map_points.at(lmap.separators_mappoints[i])->p_world);
                 global_opt_.optimizer.addVertex(landmark);
                 global_opt_.newVertices.insert(landmark);
@@ -283,27 +354,27 @@ namespace visual_slam{
         }
 
         // add condensed measurements: first frame - origin frame
-        Vector3dVector control_pts;
         Eigen::Matrix3d covariance;
-        Eigen::Matrix3d omega;
+        Eigen::Matrix3d new_cov;
 
         if (lmap.seq != 0){
 
             g2o::EdgeSE2* first_to_origin = new g2o::EdgeSE2();
-            ROS_INFO_STREAM("Adding condensed measurements of pose " << lmap.first_frame_ptr->seq);
+            // ROS_INFO_STREAM("Adding condensed measurements of pose " << lmap.first_frame_ptr->seq);
             Eigen::Isometry2d mean = lmap.origin_ptr->robot_pose.inverse()*lmap.first_frame_ptr->robot_pose;
             
-            covariance = *marginals.block(      optimizer.vertex(camera_to_graph.at(lmap.first_frame_ptr->seq))->hessianIndex(),
-                                                optimizer.vertex(camera_to_graph.at(lmap.first_frame_ptr->seq))->hessianIndex());
-            covariance_3d_to_control_points( covariance,  t2v(mean), control_pts);
-            control_pts_to_pose_omega(  control_pts, t2v(mean), 
-                                        lmap.origin_ptr->robot_pose, lmap.first_frame_ptr->robot_pose,
-                                        omega);
+            covariance = marginals.block(      optimizer.vertex(camera_to_graph.at(lmap.first_frame_ptr->seq))->hessianIndex(),
+                                                optimizer.vertex(camera_to_graph.at(lmap.first_frame_ptr->seq))->hessianIndex())->eval();
+            pose_unscented_mapping (covariance, t2v(mean), new_cov,
+	                                        lmap.origin_ptr->robot_pose, lmap.first_frame_ptr->robot_pose);
+                                        
             first_to_origin->setVertex(0, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.origin_ptr->seq))));
             first_to_origin->setVertex(1, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.first_frame_ptr->seq))));
             first_to_origin->setMeasurement(g2o::SE2(mean));
             first_to_origin->setRobustKernel( new g2o::RobustKernelHuber() );
-            first_to_origin->setInformation(omega);
+            first_to_origin->setInformation(new_cov.inverse().eval());
+            // first_to_origin->setInformation(Eigen::Matrix3d::Identity());
+
             global_opt_.optimizer.addEdge(first_to_origin);
             global_opt_.newEdges.insert(first_to_origin);
 
@@ -311,37 +382,42 @@ namespace visual_slam{
 
         // add condensed measurements: last frame - origin frame
         g2o::EdgeSE2* last_to_origin = new g2o::EdgeSE2();
-        ROS_INFO_STREAM("Adding condensed measurements of pose " << lmap.last_frame_ptr->seq);
+        // ROS_INFO_STREAM("Adding condensed measurements of pose " << lmap.last_frame_ptr->seq);
         Eigen::Isometry2d mean = lmap.origin_ptr->robot_pose.inverse()*lmap.last_frame_ptr->robot_pose;
         covariance = marginals.block(  optimizer.vertex(camera_to_graph.at(lmap.last_frame_ptr->seq))->hessianIndex(),
                                         optimizer.vertex(camera_to_graph.at(lmap.last_frame_ptr->seq))->hessianIndex())->eval();                                                                
-        covariance_3d_to_control_points( covariance,  t2v(mean), control_pts);
-        control_pts_to_pose_omega(  control_pts, t2v(mean), 
-                                    lmap.origin_ptr->robot_pose, lmap.last_frame_ptr->robot_pose,
-                                    omega);
+        pose_unscented_mapping (covariance, t2v(mean), new_cov,
+	                                        lmap.origin_ptr->robot_pose, lmap.last_frame_ptr->robot_pose);
         last_to_origin->setVertex(0, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.origin_ptr->seq))));
         last_to_origin->setVertex(1, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.last_frame_ptr->seq))));
         last_to_origin->setMeasurement(g2o::SE2(mean));
         last_to_origin->setRobustKernel( new g2o::RobustKernelHuber() );
-        last_to_origin->setInformation(omega);
+        last_to_origin->setInformation(new_cov.inverse().eval());
+
         global_opt_.optimizer.addEdge(last_to_origin);
         global_opt_.newEdges.insert(last_to_origin);
 
         // add condensed measurements: landmark - origin frame
         for (int i = 0; i < lmap.separators_mappoints.size(); i++){
-            ROS_INFO_STREAM("Adding condensed measurements of landmark " << lmap.separators_mappoints[i]);
+
+            if (std::find(global_opt_.outliers_landmarks.begin(), global_opt_.outliers_landmarks.end(), lmap.separators_mappoints[i]) 
+                        != global_opt_.outliers_landmarks.end()){
+                            continue;
+                        }
+
+            // ROS_INFO_STREAM("Adding condensed measurements of landmark " << lmap.separators_mappoints[i]);
+            covariance = marginals.block(       optimizer.vertex(landmark_to_graph.at(lmap.separators_mappoints[i]))->hessianIndex(),
+                                                optimizer.vertex(landmark_to_graph.at(lmap.separators_mappoints[i]))->hessianIndex())->eval();
+            
             EdgeSE2landmarkXYZ* landmark_condensed_edge = new EdgeSE2landmarkXYZ();
-            Eigen::Vector3d mean_lm = lmap.origin_ptr->robot_pose.inverse() * landmarks_map_->map_points.at(lmap.separators_mappoints[i])->p_world;
-            covariance = marginals.block(      optimizer.vertex(landmark_to_graph.at(lmap.separators_mappoints[i]))->hessianIndex(),
-                                        optimizer.vertex(landmark_to_graph.at(lmap.separators_mappoints[i]))->hessianIndex())->eval();
-                                                
-            covariance_3d_to_control_points( covariance,  mean_lm, control_pts);
-            omega = covariance.inverse();
-            landmark_condensed_edge->setVertex(0, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.origin_ptr->seq))));
-            landmark_condensed_edge->setVertex(1, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.landmark_to_graph.at(lmap.separators_mappoints[i]))));
+            Eigen::Vector3d mean_lm = t2t3d(lmap.origin_ptr->robot_pose).inverse() * landmarks_map_->map_points.at(lmap.separators_mappoints[i])->p_world;            
+            landmark_unscented_mapping (covariance, new_cov,
+	                                         lmap.origin_ptr->robot_pose);
+            landmark_condensed_edge->setVertex(0, dynamic_cast<g2o::VertexPointXYZ*> (global_opt_.optimizer.vertex(global_opt_.landmark_to_graph.at(lmap.separators_mappoints[i]))));
+            landmark_condensed_edge->setVertex(1, dynamic_cast<g2o::VertexSE2*> (global_opt_.optimizer.vertex(global_opt_.camera_to_graph.at(lmap.origin_ptr->seq))));
             landmark_condensed_edge->setMeasurement(mean_lm);
             landmark_condensed_edge->setRobustKernel( new g2o::RobustKernelHuber() );
-            landmark_condensed_edge->setInformation(omega);
+            landmark_condensed_edge->setInformation(new_cov.inverse().eval());
             global_opt_.optimizer.addEdge(landmark_condensed_edge);
             global_opt_.newEdges.insert(landmark_condensed_edge);
 
@@ -353,13 +429,19 @@ namespace visual_slam{
 
         if(global_opt_.initialized){
             global_opt_.optimizer.updateInitialization(global_opt_.newVertices,global_opt_.newEdges);
+            global_opt_.newEdges.clear();
+            global_opt_.newVertices.clear();
+            global_opt_.optimizer.optimize(50,true);
+        
         }else{
             global_opt_.optimizer.initializeOptimization();
-        }
-        global_opt_.newEdges.clear();
-        global_opt_.newVertices.clear();
+            global_opt_.initialized = true;
+            global_opt_.newEdges.clear();
+            global_opt_.newVertices.clear();
 
-        global_opt_.optimizer.optimize(10);
+            global_opt_.optimizer.optimize(20);
+        }
+        
 
         for (const auto &myPair : global_opt_.camera_to_graph){
 

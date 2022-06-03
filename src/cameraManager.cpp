@@ -1,6 +1,6 @@
 #include <cameraManager.hpp>
 
-namespace visual_slam{
+namespace planar_monocular_slam{
 
     void CameraManager::addCamera(cv::Mat& image,Eigen::Isometry2d& pose){
         cv::Mat clahe_image;
