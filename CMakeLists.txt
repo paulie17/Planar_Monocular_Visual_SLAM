@@ -16,6 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   message_filters
   eigen_conversions  
+  genmsg
+  tf
+  tf2
 )
 
 find_package(Eigen3 REQUIRED)
@@ -28,7 +31,12 @@ include_directories(${CHOLMOD_INCLUDE_DIR})
 find_package(CSparse REQUIRED)
 include_directories(${CSPARSE_INCLUDE_DIR})
 
+## Declare ROS messages and services
+add_service_files(FILES BARequest.srv)
 
+
+## Generate added messages and services
+generate_messages(DEPENDENCIES std_msgs)
 
 catkin_package()
 
@@ -37,7 +45,7 @@ include_directories(include  ${catkin_INCLUDE_DIRS})
 ### Targets ###
 add_library(planar_monocular_slam
             include/utils.hpp
-            include/g2otypes.hpp
+            include/g2otypes.hpp  
             src/cameraManager.cpp
             src/Map.cpp 
             src/MapPoint.cpp 
@@ -55,4 +63,13 @@ g2o_solver_cholmod cholmod
 # g2o_csparse_extension
 # g2o_solver_pcg
 )
+add_dependencies(planar_monocular_slam_node planar_monocular_slam_thesis_gencpp)
+
+add_executable(tf_to_path Executables/tf_to_path.cpp)
+target_link_libraries(tf_to_path ${catkin_LIBRARIES})
+
+add_executable(evaluation_node Executables/evaluation_node.cpp)
+target_link_libraries(evaluation_node ${catkin_LIBRARIES})
+
+
 

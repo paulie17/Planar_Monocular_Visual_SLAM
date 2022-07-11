@@ -29,7 +29,7 @@ namespace planar_monocular_slam{
             return;
         }
 
-        else if(frames_vector_ptr_->back()->seq % 9 == 0 && maps_.back().last_frame_ptr==nullptr){
+        else if(frames_vector_ptr_->back()->seq % 4 == 0 && maps_.back().last_frame_ptr==nullptr){
             // Every 10 frames write the 10th frame as the last of the current local map and the first of the new local map
             
             maps_.back().last_frame_ptr = frames_vector_ptr_->back();                        
@@ -58,7 +58,7 @@ namespace planar_monocular_slam{
         }
 
         
-        else if(frames_vector_ptr_->back()->seq - maps_.back().first_frame_ptr->seq == 4 && maps_.back().origin_ptr==nullptr){
+        else if(frames_vector_ptr_->back()->seq - maps_.back().first_frame_ptr->seq == 2 && maps_.back().origin_ptr==nullptr){
             // if the new local map is not the first one to be written, save the origin when you reveive the 5th frame 
             maps_.back().origin_ptr = frames_vector_ptr_->back();
             return;
@@ -157,7 +157,7 @@ namespace planar_monocular_slam{
         Eigen::Matrix3d covariance = marginals.block(  optimizer.vertex(graph_index)->hessianIndex(),
                                                     optimizer.vertex(graph_index)->hessianIndex())->eval();
 
-        double condition_number = covariance.eigenvalues().real().maxCoeff()/covariance.eigenvalues().real().minCoeff();
+        double condition_number = abs(covariance.eigenvalues().real().maxCoeff())/abs(covariance.eigenvalues().real().minCoeff());
         if(condition_number > 10e5 ){
             return false;}
         else{
@@ -445,8 +445,12 @@ namespace planar_monocular_slam{
 
         for (const auto &myPair : global_opt_.camera_to_graph){
 
-            g2o::VertexSE2* updated_pose = static_cast< g2o::VertexSE2*> ( global_opt_.optimizer.vertex(myPair.second) ); 
+            g2o::VertexSE2* updated_pose = static_cast< g2o::VertexSE2*> ( global_opt_.optimizer.vertex(myPair.second) );             
             frames_vector_ptr_->at(myPair.first)->robot_pose = updated_pose->estimate().toIsometry();
+            if (!frames_vector_ptr_->at(myPair.first)->condensed_flag)
+                {
+                    frames_vector_ptr_->at(myPair.first)->condensed_flag = true;
+                }
         }
 
         for (const auto &myPair : global_opt_.landmark_to_graph){

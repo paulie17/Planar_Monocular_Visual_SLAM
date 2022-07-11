@@ -1,0 +1,12 @@
+<launch>
+
+         <!-- Show in Rviz    -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find planar_monocular_slam_thesis)/rviz/gt_config.rviz" required="true"  output="screen" launch-prefix="xterm -e" />
+
+    <node pkg="rosbag" type="play" name="player" output="screen"
+          args="--clock /home/paolo/gt_2022-06-28-10-57-13.bag"/>
+          
+    <node name="tf_listener" pkg="planar_monocular_slam_thesis" type="tf_to_path" output="screen" > </node>
+
+
+</launch>

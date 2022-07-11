@@ -261,13 +261,16 @@ namespace planar_monocular_slam{
         return x;
     }
 
-    void CameraManager::fullBA(){ 
+    void CameraManager::fullBA(int iterations, bool verbose){ 
 
         typedef g2o::BlockSolver< g2o::BlockSolverTraits<3,3> > Block;
         Block::LinearSolverType* linearSolver = new g2o::LinearSolverEigen<Block::PoseMatrixType>();
         Block* solver_ptr = new Block( std::unique_ptr<Block::LinearSolverType>(linearSolver) );
         g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(std::unique_ptr<Block>(solver_ptr) );
         g2o::SparseOptimizer optimizer;
+
+        std::vector< EdgeSE2projectXYZ* > projections_edges_vector;
+
         optimizer.setAlgorithm( algorithm );
 
         for (int i = 0; i < camera_vector_.size(); i ++){
@@ -302,6 +305,7 @@ namespace planar_monocular_slam{
                 landmark_projection_edge -> setRobustKernel( new g2o::RobustKernelHuber() );
                 landmark_projection_edge -> setInformation( Eigen::Matrix2d::Identity() );
                 optimizer.addEdge( landmark_projection_edge );
+                projections_edges_vector.push_back(landmark_projection_edge);
             }
 
             if ( i !=0 ){
@@ -316,9 +320,9 @@ namespace planar_monocular_slam{
             }
 
         }
-        // optimizer.setVerbose(true);
+        optimizer.setVerbose(verbose);
         optimizer.initializeOptimization();
-        optimizer.optimize(5);
+        optimizer.optimize(iterations);
 
         // update current estimates with optimization results
         for (int i = 0; i < camera_vector_.size(); i ++){
@@ -329,6 +333,78 @@ namespace planar_monocular_slam{
             g2o::VertexPointXYZ* landmark_update = static_cast< g2o::VertexPointXYZ*> ( optimizer.vertex(allpoints.first + camera_vector_.size() ) ); 
             allpoints.second->p_world = landmark_update->estimate();
         }
+    }
+
+    void CameraManager::pgo(int iterations, bool verbose){ 
+
+        typedef g2o::BlockSolver< g2o::BlockSolverTraits<3,3> > Block;
+        Block::LinearSolverType* linearSolver = new g2o::LinearSolverEigen<Block::PoseMatrixType>();
+        Block* solver_ptr = new Block( std::unique_ptr<Block::LinearSolverType>(linearSolver) );
+        g2o::OptimizationAlgorithmLevenberg* algorithm = new g2o::OptimizationAlgorithmLevenberg(std::unique_ptr<Block>(solver_ptr) );
+        g2o::SparseOptimizer optimizer;
+
+        std::vector< EdgeSE2projectXYZ* > projections_edges_vector;
+
+        optimizer.setAlgorithm( algorithm );
+
+        for (int i = 0; i < camera_vector_.size(); i ++){
+
+            VertexRobotSE2* robot = new VertexRobotSE2();
+            robot->setId(i);
+            robot->setFixed(i==0);
+            robot->setEstimate(camera_vector_[i]->robot_pose);
+            robot->p_matrix = camera_vector_[i]->p_matrix;
+            optimizer.addVertex(robot);             
+
+        }
+
+        for ( auto& allpoints: map_->map_points ){
+
+            g2o::VertexPointXYZ* landmark = new g2o::VertexPointXYZ();
+            landmark->setId(camera_vector_.size() + allpoints.first);
+            landmark->setFixed(1);
+            landmark->setMarginalized(true);
+            landmark->setEstimate(allpoints.second->p_world);
+            optimizer.addVertex(landmark);
+
+        }
+
+        for (int i = 0; i < camera_vector_.size(); i++){
+
+            for (auto& observations: camera_vector_[i]->observed_points){
+
+                EdgeSE2projectXYZ* landmark_projection_edge = new EdgeSE2projectXYZ();
+                landmark_projection_edge -> setVertex( 0, dynamic_cast<g2o::VertexPointXYZ*>   (optimizer.vertex(observations.second->id + camera_vector_.size())) );
+                landmark_projection_edge -> setVertex( 1, dynamic_cast<VertexRobotSE2*>   (optimizer.vertex(i)));
+                landmark_projection_edge -> setMeasurement (Eigen::Vector2d(camera_vector_[i]->kpts[observations.first].x,camera_vector_[i]->kpts[observations.first].y));
+                landmark_projection_edge -> setRobustKernel( new g2o::RobustKernelHuber() );
+                landmark_projection_edge -> setInformation( Eigen::Matrix2d::Identity() );
+                optimizer.addEdge( landmark_projection_edge );
+                projections_edges_vector.push_back(landmark_projection_edge);
+            }
+
+            if ( i !=0 ){
+
+                EdgeSE2Custom* odometry_edge = new EdgeSE2Custom();
+                odometry_edge -> setVertex( 0, dynamic_cast<VertexRobotSE2*>   (optimizer.vertex(i-1)));
+                odometry_edge -> setVertex( 1, dynamic_cast<VertexRobotSE2*>   (optimizer.vertex(i)));
+                odometry_edge -> setMeasurement (camera_vector_[i]->odom_displ);
+                odometry_edge -> setRobustKernel( new g2o::RobustKernelHuber() );
+                odometry_edge -> setInformation( Eigen::Matrix3d::Identity() );
+                optimizer.addEdge( odometry_edge );
+            }
+
+        }
+        optimizer.setVerbose(verbose);
+        optimizer.initializeOptimization();
+        optimizer.optimize(iterations);
+
+        // update current estimates with optimization results
+        for (int i = 0; i < camera_vector_.size(); i ++){
+            VertexRobotSE2* pose_update = static_cast< VertexRobotSE2*> ( optimizer.vertex(i) );  
+            camera_vector_[i]->robot_pose = pose_update->estimate();
+        }
+
     }
 
 } // visual_slam

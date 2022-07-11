@@ -9,6 +9,7 @@
 #include <g2o/stuff/unscented.h>
 #include <g2o/core/block_solver.h>
 #include <g2o/core/sparse_optimizer.h>
+#include "g2o/core/sparse_optimizer_terminate_action.h"
 #include <g2o/core/robust_kernel.h>
 #include <g2o/core/robust_kernel_impl.h>
 
@@ -93,7 +94,7 @@ namespace planar_monocular_slam{
                 // v(2) = atan2(transform.linear()(1,0), transform.linear()(0,0));
                 // _error = _measurement - v;
                 // _error[2] = g2o::normalize_theta(_error[2]);
-                _error = t2v(transform);
+                _error = t2v(v2t(_measurement).inverse()*transform);
             }
     };
 

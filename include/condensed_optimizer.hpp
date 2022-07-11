@@ -2,7 +2,6 @@
 
 #include <g2o/core/sparse_block_matrix.h>
 #include <cameraManager.hpp>
-#include <ros/ros.h>
 
 namespace planar_monocular_slam{
 
@@ -44,7 +43,7 @@ namespace planar_monocular_slam{
 
         public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-        condensed_optimizer( const std::vector<Camera::Ptr> &vector_ptr, world_Map::ConstPtr ptr_to_map):
+        condensed_optimizer( std::vector<Camera::Ptr> &vector_ptr, world_Map::ConstPtr ptr_to_map):
             landmarks_map_(ptr_to_map),
             frames_vector_ptr_(&vector_ptr)
         {
@@ -98,7 +97,7 @@ namespace planar_monocular_slam{
 						                    const g2o::SparseOptimizer& optimizer,
 						                    int graph_index);
 
-        const std::vector<Camera::Ptr>* frames_vector_ptr_;
+        std::vector<Camera::Ptr>* frames_vector_ptr_;
         std::vector<local_map> maps_;
         world_Map::ConstPtr landmarks_map_;
         global_optimizer global_opt_;        

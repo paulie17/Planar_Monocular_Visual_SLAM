@@ -21,6 +21,7 @@ namespace planar_monocular_slam{
         typedef std::shared_ptr<const Camera> ConstPtr;
 
         int seq;
+        bool condensed_flag = false;
         cv::Mat dscs;
         std::vector<cv::Point2f> kpts;
         Eigen::Isometry2d robot_pose; // robot pose from odometry when the frame has been captured in SE(2)
@@ -84,7 +85,9 @@ namespace planar_monocular_slam{
         void matchNewKeypoints();   // match features of the last added camera frame with its previous, with candidate map point and with the unassigned keypoints
                                     // from the second last added frame.
 
-        void fullBA(); // do full Bundle Adjustment with all points found and full trajectory
+        void fullBA(int iterations, bool verbose); // do full Bundle Adjustment with all points found and full trajectory
+
+        void pgo(int iterations, bool verbose); // do full Bundle Adjustment with all points found and full trajectory
 
         world_Map::ConstPtr map(){
             return std::const_pointer_cast<const world_Map>(map_);
@@ -94,7 +97,7 @@ namespace planar_monocular_slam{
             return std::const_pointer_cast<const Camera>(camera_vector_.back());
         }
 
-        const std::vector<Camera::Ptr>& keyframes_vector_(){
+        std::vector<Camera::Ptr>& keyframes_vector_(){
             return camera_vector_;
         }
 

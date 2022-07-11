@@ -2,15 +2,17 @@
 
 namespace planar_monocular_slam{
 
-    FrameProc::FrameProc(ros::NodeHandle* nodehandle):
+    FrameProc::FrameProc(ros::NodeHandle* nodehandle,std::string opt_type_string):
             nh_(*nodehandle),
             cams_(),
-            opt_(cams_.keyframes_vector_(),cams_.map())
+            opt_(cams_.keyframes_vector_(),cams_.map()),
+            opt_type_(opt_type_string)
         {
             marker_pub_ = nh_.advertise<visualization_msgs::Marker>("map_points", 1);
 
             odom_path_pub_ = nh_.advertise<nav_msgs::Path>("/odom_path", 1);
             opt_path_pub_ = nh_.advertise<nav_msgs::Path>("/opt_path", 1);
+            ba_server = nh_.advertiseService("request_ba", &FrameProc::ba_service,this);
 
             image_sub_.subscribe(nh_, "/camera/image_raw", 1);
             odom_sub_.subscribe(nh_,"/odom",1);
@@ -53,35 +55,68 @@ namespace planar_monocular_slam{
         // Create the vertices for the points and lines
         for (auto& allpoints: cams_.map()->map_points)
         {
+        if(allpoints.second->observed_frames.size()>4){
 
-        geometry_msgs::Point p;
-        p.x = allpoints.second->p_world.x();
-        p.y = allpoints.second->p_world.y();
-        p.z = allpoints.second->p_world.z();
+            geometry_msgs::Point p;
+            p.x = allpoints.second->p_world.x();
+            p.y = allpoints.second->p_world.y();
+            p.z = allpoints.second->p_world.z();
 
-        points_list.points.push_back(p);
-
+            points_list.points.push_back(p);
+            }
         }
+
         marker_pub_.publish(points_list);
     }
 
-    void FrameProc::visualizeTrajectory(){
+    void FrameProc::visualize_condensed_Trajectory(){
 
         nav_msgs::Path opt_path_;
         opt_path_.header.stamp = ros::Time::now();
         opt_path_.header.frame_id = "my_frame";
 
         for (int i = 0; i < cams_.n_of_cams(); i++){
-
+            if (cams_.keyframes_vector_().at(i)->condensed_flag){
             geometry_msgs::PoseStamped  pose;
             tf::poseEigenToMsg(t2t3d(cams_.keyframes_vector_().at(i)->robot_pose),pose.pose);
             pose.header.frame_id= "my_frame";
-            pose.header.stamp= ros::Time::now();
+            pose.header.stamp= time_stamps_vector_[cams_.keyframes_vector_().at(i)->seq];
+            opt_path_.poses.push_back(pose);
+            }
+
+        }
+
+        opt_path_pub_.publish(opt_path_);
+    }
+
+    void FrameProc::visualize_full_Trajectory(){
+
+        nav_msgs::Path opt_path_;
+        opt_path_.header.stamp = ros::Time::now();
+        opt_path_.header.frame_id = "my_frame";
+
+        for (int i = 0; i < cams_.n_of_cams(); i++){
+            geometry_msgs::PoseStamped  pose;
+            tf::poseEigenToMsg(t2t3d(cams_.keyframes_vector_().at(i)->robot_pose),pose.pose);
+            pose.header.frame_id= "my_frame";
+            pose.header.stamp= time_stamps_vector_[cams_.keyframes_vector_().at(i)->seq];
             opt_path_.poses.push_back(pose);
 
         }
 
         opt_path_pub_.publish(opt_path_);
+    }
+
+    bool FrameProc::ba_service(     planar_monocular_slam_thesis::BARequest::Request &req,
+                                    planar_monocular_slam_thesis::BARequest::Response &res){
+        ROS_INFO("Starting full bundle adjustment: ");
+        // cams_.fullBA(req.iterations,true);          
+        cams_.pgo(req.iterations,true);      
+        ROS_INFO("Completed full bundle adjustment with %d iterations.", req.iterations);
+        visualizeMap();
+        visualize_full_Trajectory();
+        res.success = true;
+        return true;
     }
 
     void FrameProc::addFrame(const sensor_msgs::ImageConstPtr& msg,const nav_msgs::Odometry::ConstPtr& odometry){
@@ -102,7 +137,8 @@ namespace planar_monocular_slam{
 
             boost::shared_ptr<sensor_msgs::CameraInfo const> shared_camera_infos;
             shared_camera_infos = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("/camera_info",nh_);
-
+            start_ = ros::WallTime::now();
+            time_stamps_vector_.push_back(msg->header.stamp);
             // Eigen::Matrix3d K;
             Eigen::Matrix<double,3,4,Eigen::RowMajor> P( shared_camera_infos->P.data() );
             // K = P.block<3,3>(0,0);
@@ -113,17 +149,30 @@ namespace planar_monocular_slam{
             pose_eigen_2d = t3t2d(pose_eigen);
             cams_.addImageSize(double(shared_camera_infos->height), double(shared_camera_infos->width));
             cams_.addCameraMatrix(P);
-            cams_.addCamera(cv_ptr->image,pose_eigen_2d);            
-            opt_.local_maps_manager();
+            cams_.addCamera(cv_ptr->image,pose_eigen_2d);  
 
+            if (!opt_type_.compare("condensed"))
+                {
+                    opt_.local_maps_manager();
+                }         
+            
             geometry_msgs::PoseStamped pose;
 
-            pose.header.stamp = ros::Time::now();
+            pose.header.stamp = msg->header.stamp;
             pose.header.frame_id = "my_frame";
             pose.pose = odometry->pose.pose;            
             odom_path_.poses.push_back(pose);
             odom_path_pub_.publish(odom_path_);
-            visualizeTrajectory();
+
+            if (!opt_type_.compare("condensed"))
+                {
+                    // visualize_condensed_Trajectory();
+                    visualize_full_Trajectory();
+                }
+            else if(!opt_type_.compare("full")){
+                visualize_full_Trajectory();
+            }
+            
         }
         else{
             // if (cams_.checkTransform(cv_ptr->image)){
@@ -132,20 +181,31 @@ namespace planar_monocular_slam{
 
                 geometry_msgs::PoseStamped pose;
 
-                pose.header.stamp = ros::Time::now();
+                pose.header.stamp = msg->header.stamp;
                 pose.header.frame_id = "my_frame";
                 pose.pose = odometry->pose.pose;            
                 odom_path_.poses.push_back(pose);
                 odom_path_pub_.publish(odom_path_);    
+
+                time_stamps_vector_.push_back(msg->header.stamp);
 
                 Eigen::Isometry3d pose_eigen;
                 Eigen::Isometry2d pose_eigen_2d;
                 tf::poseMsgToEigen(odometry->pose.pose,pose_eigen);
                 pose_eigen_2d = t3t2d(pose_eigen);
                 cams_.addCamera(cv_ptr->image,pose_eigen_2d);
-                opt_.local_maps_manager();
-                // cams_.fullBA();
-                visualizeTrajectory();
+
+                if (!opt_type_.compare("condensed"))
+                {
+                    opt_.local_maps_manager();
+                    // visualize_condensed_Trajectory();
+                    visualize_full_Trajectory();
+                }
+                else if(!opt_type_.compare("full")){
+                    cams_.fullBA(1,false);
+                    visualize_full_Trajectory();
+                }
+
                 visualizeMap();
 
             } else {
@@ -153,7 +213,8 @@ namespace planar_monocular_slam{
             }
             // ros::shutdown();
         }            
-
+        ros::WallDuration till_now_ = ros::WallTime::now() - start_;
+        ROS_INFO_STREAM("Duration till now: " << till_now_.toSec());
         ROS_INFO_STREAM("Number of keyframes added:" << cams_.n_of_cams());
         ROS_INFO_STREAM("Number of local_maps written in the condensed optimizers:" << opt_.n_of_local_maps());
 
