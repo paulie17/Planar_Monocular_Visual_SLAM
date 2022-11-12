@@ -43,9 +43,7 @@ catkin_package()
 include_directories(include  ${catkin_INCLUDE_DIRS})
 
 ### Targets ###
-add_library(planar_monocular_slam
-            include/utils.hpp
-            include/g2otypes.hpp  
+add_library(planar_monocular_slam SHARED   
             src/cameraManager.cpp
             src/Map.cpp 
             src/MapPoint.cpp 
